@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    /* Deep Charcoal Background (Not pure black) */
+    --background: 224 71% 4%;
+    /* #020817 - Very dark blue/slate */
+    --foreground: 210 40% 98%;
+    /* #f8fafc */
+
+    /* Electric Teal Primary */
+    --primary: 173 80% 40%;
+    /* #14b8a6 - Teal 500 */
+    --primary-foreground: 224 71% 4%;
+
+    /* Vivid Purple Accent */
+    --secondary: 270 95% 60%;
+    /* #9333ea - Purple 600-ish */
+    --secondary-foreground: 210 40% 98%;
+
+    /* Muted/Subtle */
+    --muted: 217 33% 17%;
+    /* #1e293b - Slate 800 */
+    --muted-foreground: 215 20% 65%;
+    /* #94a3b8 - Slate 400 */
+
+    /* Cards/Surfaces - Slightly lighter than bg */
+    --card: 222 47% 11%;
+    /* #0f172a - Slate 900 */
+    --card-foreground: 210 40% 98%;
+
+    /* Borders */
+    --border: 217 33% 17%;
+    /* Slate 800 */
+
+    /* Global Radius */
+    --radius: 0.5rem;
+  }
+
+  /* Force Dark Mode Default */
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
