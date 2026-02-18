@@ -1,0 +1,39 @@
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+python-dotenv==1.0.1
+pydantic[email]==2.10.3
+pydantic-settings==2.6.1
+
+# Supabase
+supabase==2.10.0
+
+# Stripe
+stripe==11.3.0
+
+# Twilio (WhatsApp + Voice)
+twilio==9.3.7
+
+# OpenAI SDK (used for both TTS and OpenRouter LLM calls)
+openai==1.57.4
+
+# Google Calendar
+google-api-python-client==2.154.0
+google-auth-httplib2==0.2.0
+google-auth-oauthlib==1.2.1
+
+# Calendly (httpx pulled in by supabase/openai)
+httpx>=0.27.0
+
+# WebSockets
+websockets>=13.0
+
+# Security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.20
+
+# Async
+anyio==4.7.0
+
+# Date parsing
+python-dateutil==2.9.0
