@@ -1,6 +1,7 @@
 import React from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
 import { LayoutDashboard, Users, MessageSquare, Calendar, BarChart3, Settings, LogOut } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { Logo } from '../ui/Logo';
 import { cn } from '../../lib/utils';
 
@@ -15,11 +16,11 @@ export default function AppLayout() {
                     </div>
 
                     <nav className="space-y-1">
-                        <NavItem to="/" icon={<LayoutDashboard size={20} />} label="Home" />
-                        <NavItem to="/agents" icon={<Users size={20} />} label="Agents" />
-                        <NavItem to="/inbox" icon={<MessageSquare size={20} />} label="Inbox" />
-                        <NavItem to="/bookings" icon={<Calendar size={20} />} label="Bookings" />
-                        <NavItem to="/leads" icon={<BarChart3 size={20} />} label="Leads" />
+                        <NavItem to="/app" icon={<LayoutDashboard size={20} />} label="Home" end />
+                        <NavItem to="/app/agents" icon={<Users size={20} />} label="Agents" />
+                        <NavItem to="/app/inbox" icon={<MessageSquare size={20} />} label="Inbox" />
+                        <NavItem to="/app/bookings" icon={<Calendar size={20} />} label="Bookings" />
+                        <NavItem to="/app/leads" icon={<BarChart3 size={20} />} label="Leads" />
                     </nav>
                 </div>
 
@@ -59,10 +60,11 @@ export default function AppLayout() {
     );
 }
 
-function NavItem({ to, icon, label }: { to: string; icon: React.ReactNode; label: string }) {
+function NavItem({ to, icon, label, end }: { to: string; icon: React.ReactNode; label: string; end?: boolean }) {
     return (
         <NavLink
             to={to}
+            end={end}
             className={({ isActive }) =>
                 cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all group relative",
@@ -89,5 +91,3 @@ function NavItem({ to, icon, label }: { to: string; icon: React.ReactNode; label
         </NavLink>
     );
 }
-
-import { motion } from 'framer-motion';

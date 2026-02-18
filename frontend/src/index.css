@@ -1,45 +1,64 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=Outfit:wght@100..900&display=swap');
 
-@layer base {
-  :root {
-    /* Deep Charcoal Background (Not pure black) */
-    --background: 224 71% 4%;
-    /* #020817 - Very dark blue/slate */
-    --foreground: 210 40% 98%;
-    /* #f8fafc */
+:root {
+  --background: 222.2 84% 4.9%;
+  --foreground: 210 40% 98%;
 
-    /* Electric Teal Primary */
-    --primary: 173 80% 40%;
-    /* #14b8a6 - Teal 500 */
-    --primary-foreground: 224 71% 4%;
+  --card: 222.2 84% 4.9%;
+  --card-foreground: 210 40% 98%;
 
-    /* Vivid Purple Accent */
-    --secondary: 270 95% 60%;
-    /* #9333ea - Purple 600-ish */
-    --secondary-foreground: 210 40% 98%;
+  --popover: 222.2 84% 4.9%;
+  --popover-foreground: 210 40% 98%;
 
-    /* Muted/Subtle */
-    --muted: 217 33% 17%;
-    /* #1e293b - Slate 800 */
-    --muted-foreground: 215 20% 65%;
-    /* #94a3b8 - Slate 400 */
+  --primary: 173 80% 40%;
+  /* Electric Teal */
+  --primary-foreground: 222.2 47.4% 11.2%;
 
-    /* Cards/Surfaces - Slightly lighter than bg */
-    --card: 222 47% 11%;
-    /* #0f172a - Slate 900 */
-    --card-foreground: 210 40% 98%;
+  --secondary: 217.2 32.6% 17.5%;
+  --secondary-foreground: 210 40% 98%;
 
-    /* Borders */
-    --border: 217 33% 17%;
-    /* Slate 800 */
+  --muted: 217.2 32.6% 17.5%;
+  --muted-foreground: 215 20.2% 65.1%;
 
-    /* Global Radius */
-    --radius: 0.5rem;
-  }
+  --accent: 217.2 32.6% 17.5%;
+  --accent-foreground: 210 40% 98%;
 
-  /* Force Dark Mode Default */
-  body {
-    @apply bg-background text-foreground;
-    font-feature-settings: "rlig" 1, "calt" 1;
-  }
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 210 40% 98%;
+
+  --border: 217.2 32.6% 17.5%;
+  --input: 217.2 32.6% 17.5%;
+  --ring: 173 80% 40%;
+
+  --radius: 0.5rem;
+}
+
+@theme {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  --color-border: hsl(var(--border));
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+
+  --font-sans: "Inter", sans-serif;
+  --font-heading: "Outfit", sans-serif;
 }
