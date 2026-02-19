@@ -10,6 +10,8 @@ router = APIRouter(prefix="/leads", tags=["leads"])
 async def list_leads(
     status: str | None = None,
     agent_id: str | None = None,
+    is_hot: bool | None = None,
+    service_type: str | None = None,
     limit: int = 100,
     user_data=Depends(get_current_user_org),
 ):
@@ -25,9 +27,37 @@ async def list_leads(
         query = query.eq("status", status)
     if agent_id:
         query = query.eq("agent_id", agent_id)
+    if is_hot is not None:
+        query = query.eq("is_hot", is_hot)
+    if service_type:
+        query = query.eq("service_type", service_type)
 
     result = query.execute()
     return result.data
+
+
+@router.get("/{lead_id}")
+async def get_lead(
+    lead_id: str,
+    user_data=Depends(get_current_user_org),
+):
+    """Get a single lead with full details including conversation transcript."""
+    admin = get_supabase_admin()
+
+    # Get lead
+    lead_result = (
+        admin.table("leads")
+        .select("*, agents(name)")
+        .eq("id", lead_id)
+        .eq("organization_id", user_data["organization_id"])
+        .single()
+        .execute()
+    )
+
+    if not lead_result.data:
+        raise HTTPException(status_code=404, detail="Lead not found")
+
+    return lead_result.data
 
 
 @router.post("")

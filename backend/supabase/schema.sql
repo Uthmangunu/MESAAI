@@ -74,8 +74,10 @@ CREATE TABLE conversations (
   contact_phone   TEXT,
   contact_email   TEXT,
   contact_name    TEXT,
-  channel         TEXT,           -- whatsapp | voice | email | telegram | web
+  channel         TEXT,           -- whatsapp | voice | email | telegram | web | facebook_messenger | instagram
   status          TEXT DEFAULT 'open',  -- open | escalated | closed
+  flow_state      JSONB DEFAULT '{}',  -- { current_step: "greeting", collected_data: {...} }
+  flow_type       TEXT,           -- conversation flow identifier (e.g., "office_cleaning", "end_of_tenancy")
   created_at      TIMESTAMPTZ DEFAULT NOW(),
   updated_at      TIMESTAMPTZ DEFAULT NOW()
 );
@@ -101,6 +103,12 @@ CREATE TABLE leads (
   email             TEXT,
   notes             TEXT,
   status            TEXT DEFAULT 'new',  -- new | contacted | qualified | converted
+  service_type      TEXT,  -- office_cleaning | fm_support | end_of_tenancy | airbnb | deep_clean
+  service_data      JSONB DEFAULT '{}',  -- service-specific fields (postcode, property_type, size, etc.)
+  lead_score        INTEGER DEFAULT 0,  -- 1-10 score
+  is_hot            BOOLEAN DEFAULT FALSE,  -- auto-tagged if score >= 7
+  urgency           TEXT,  -- within_48h | within_7days | within_30days | flexible
+  source_channel    TEXT,  -- facebook_messenger | instagram | whatsapp | web | etc.
   created_at        TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -154,18 +162,42 @@ CREATE TABLE knowledge_base (
   updated_at        TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- ─── Conversation Flows ──────────────────────────────────────────────────────
+-- Defines branching conversation paths for custom employee types
+CREATE TABLE conversation_flows (
+  id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  employee_type_id    UUID NOT NULL REFERENCES employee_types(id) ON DELETE CASCADE,
+  flow_name           TEXT NOT NULL,  -- 'office_cleaning', 'end_of_tenancy', etc.
+  flow_definition     JSONB NOT NULL,  -- { steps: [...], branches: [...] }
+  is_active           BOOLEAN DEFAULT TRUE,
+  created_at          TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ─── Lead Scoring Rules ──────────────────────────────────────────────────────
+-- Configurable rules for automatic lead scoring
+CREATE TABLE lead_scoring_rules (
+  id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  employee_type_id    UUID NOT NULL REFERENCES employee_types(id) ON DELETE CASCADE,
+  rule_name           TEXT NOT NULL,
+  conditions          JSONB NOT NULL,  -- { urgency: "within_48h", service_type: "office_cleaning" }
+  score_adjustment    INTEGER NOT NULL,  -- +3, +5, etc.
+  created_at          TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- ─── Row Level Security ──────────────────────────────────────────────────────
-ALTER TABLE organizations    ENABLE ROW LEVEL SECURITY;
-ALTER TABLE users            ENABLE ROW LEVEL SECURITY;
-ALTER TABLE agents           ENABLE ROW LEVEL SECURITY;
-ALTER TABLE agent_channels   ENABLE ROW LEVEL SECURITY;
-ALTER TABLE conversations    ENABLE ROW LEVEL SECURITY;
-ALTER TABLE messages         ENABLE ROW LEVEL SECURITY;
-ALTER TABLE leads            ENABLE ROW LEVEL SECURITY;
-ALTER TABLE bookings         ENABLE ROW LEVEL SECURITY;
-ALTER TABLE agent_logs       ENABLE ROW LEVEL SECURITY;
-ALTER TABLE integrations     ENABLE ROW LEVEL SECURITY;
-ALTER TABLE knowledge_base   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE organizations        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE users                ENABLE ROW LEVEL SECURITY;
+ALTER TABLE agents               ENABLE ROW LEVEL SECURITY;
+ALTER TABLE agent_channels       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE conversations        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE messages             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE leads                ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bookings             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE agent_logs           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE integrations         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE knowledge_base       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE conversation_flows   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE lead_scoring_rules   ENABLE ROW LEVEL SECURITY;
 -- Note: All DB access from the backend uses the service role key which bypasses RLS.
 -- RLS policies are here as a safety net for direct Supabase client access.
 
@@ -174,8 +206,13 @@ CREATE INDEX idx_agents_org ON agents(organization_id);
 CREATE INDEX idx_conversations_agent ON conversations(agent_id);
 CREATE INDEX idx_messages_conversation ON messages(conversation_id);
 CREATE INDEX idx_leads_org ON leads(organization_id);
+CREATE INDEX idx_leads_score ON leads(lead_score DESC);
+CREATE INDEX idx_leads_hot ON leads(is_hot) WHERE is_hot = TRUE;
+CREATE INDEX idx_leads_service_type ON leads(service_type);
 CREATE INDEX idx_bookings_org ON bookings(organization_id);
 CREATE INDEX idx_agent_logs_agent ON agent_logs(agent_id);
 CREATE INDEX idx_agent_logs_created ON agent_logs(created_at DESC);
 CREATE INDEX idx_knowledge_base_org ON knowledge_base(organization_id);
 CREATE INDEX idx_knowledge_base_agent ON knowledge_base(agent_id);
+CREATE INDEX idx_conversation_flows_type ON conversation_flows(employee_type_id);
+CREATE INDEX idx_lead_scoring_rules_type ON lead_scoring_rules(employee_type_id);

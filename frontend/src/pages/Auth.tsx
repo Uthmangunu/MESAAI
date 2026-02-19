@@ -1,27 +1,54 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Logo } from '../components/ui/Logo';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Github, Globe } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function AuthPage() {
     const [isLogin, setIsLogin] = React.useState(true);
+    const [email, setEmail] = React.useState('');
+    const [password, setPassword] = React.useState('');
+    const [orgName, setOrgName] = React.useState('');
+    const [error, setError] = React.useState('');
+    const [loading, setLoading] = React.useState(false);
+
+    const { login, signup } = useAuth();
+    const navigate = useNavigate();
+
+    async function handleSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        setError('');
+        setLoading(true);
+        try {
+            if (isLogin) {
+                await login(email, password);
+                navigate('/app');
+            } else {
+                const res = await signup(email, password, orgName);
+                // Show confirmation message, then switch to login
+                setError(res.message);
+                setIsLogin(true);
+            }
+        } catch (err: any) {
+            setError(err.message || 'Something went wrong');
+        } finally {
+            setLoading(false);
+        }
+    }
 
     return (
         <div className="flex min-h-screen bg-[#020817] text-white">
             {/* Left Panel - Branding */}
             <div className="hidden w-1/2 flex-col justify-between bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-[#020817] to-[#020817] p-12 lg:flex relative overflow-hidden">
-
-                {/* Abstract Background Shapes */}
                 <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
                     <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-primary/20 rounded-full blur-[120px] opacity-20 animate-pulse"></div>
                     <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-secondary/20 rounded-full blur-[120px] opacity-20"></div>
                 </div>
-
                 <div className="z-10">
                     <Logo className="text-3xl" />
                 </div>
-
                 <div className="z-10 max-w-md space-y-4">
                     <h1 className="text-5xl font-bold tracking-tight text-white">
                         Your AI Workforce, <br />
@@ -32,7 +59,6 @@ export default function AuthPage() {
                         Seamlessly integrated. Beautifully designed.
                     </p>
                 </div>
-
                 <div className="z-10 text-sm text-slate-500">
                     © 2025 Mesa AI Inc.
                 </div>
@@ -49,36 +75,55 @@ export default function AuthPage() {
                             {isLogin ? "Welcome back" : "Create an account"}
                         </h2>
                         <p className="text-sm text-slate-400">
-                            {isLogin ? "Enter your email to sign in to your account" : "Enter your email below to create your account"}
+                            {isLogin ? "Sign in to your account" : "Enter your details to get started"}
                         </p>
                     </div>
 
                     <div className="grid gap-6">
-                        <form onSubmit={(e) => e.preventDefault()}>
+                        <form onSubmit={handleSubmit}>
                             <div className="grid gap-4">
-                                <div className="grid gap-2">
+                                {!isLogin && (
                                     <Input
-                                        id="email"
-                                        placeholder="name@example.com"
-                                        type="email"
-                                        autoCapitalize="none"
-                                        autoComplete="email"
-                                        autoCorrect="off"
+                                        placeholder="Company name"
+                                        type="text"
+                                        value={orgName}
+                                        onChange={(e) => setOrgName(e.target.value)}
+                                        required
                                         className="bg-slate-900/50 border-slate-800 focus:border-primary/50 text-white placeholder:text-slate-500"
                                     />
-                                </div>
-                                {!isLogin && (
-                                    <div className="grid gap-2">
-                                        <Input
-                                            id="password"
-                                            placeholder="Password"
-                                            type="password"
-                                            className="bg-slate-900/50 border-slate-800 focus:border-primary/50 text-white placeholder:text-slate-500"
-                                        />
-                                    </div>
                                 )}
-                                <Button className="w-full bg-primary hover:bg-primary/90 text-slate-950 font-bold">
-                                    {isLogin ? "Sign In with Email" : "Sign Up with Email"}
+                                <Input
+                                    placeholder="name@example.com"
+                                    type="email"
+                                    autoComplete="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    required
+                                    className="bg-slate-900/50 border-slate-800 focus:border-primary/50 text-white placeholder:text-slate-500"
+                                />
+                                <Input
+                                    placeholder="Password"
+                                    type="password"
+                                    autoComplete={isLogin ? 'current-password' : 'new-password'}
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    required
+                                    minLength={8}
+                                    className="bg-slate-900/50 border-slate-800 focus:border-primary/50 text-white placeholder:text-slate-500"
+                                />
+
+                                {error && (
+                                    <p className={`text-sm text-center ${error.includes('Check your email') ? 'text-emerald-400' : 'text-red-400'}`}>
+                                        {error}
+                                    </p>
+                                )}
+
+                                <Button
+                                    type="submit"
+                                    disabled={loading}
+                                    className="w-full bg-primary hover:bg-primary/90 text-slate-950 font-bold disabled:opacity-50"
+                                >
+                                    {loading ? 'Please wait…' : isLogin ? 'Sign In' : 'Create Account'}
                                 </Button>
                             </div>
                         </form>
@@ -102,21 +147,9 @@ export default function AuthPage() {
                         </div>
                     </div>
 
-                    <p className="px-8 text-center text-sm text-slate-500">
-                        By clicking continue, you agree to our{" "}
-                        <a href="#" className="underline underline-offset-4 hover:text-primary">
-                            Terms of Service
-                        </a>{" "}
-                        and{" "}
-                        <a href="#" className="underline underline-offset-4 hover:text-primary">
-                            Privacy Policy
-                        </a>
-                        .
-                    </p>
-
                     <div className="text-center">
                         <button
-                            onClick={() => setIsLogin(!isLogin)}
+                            onClick={() => { setIsLogin(!isLogin); setError(''); }}
                             className="text-sm text-primary hover:underline"
                         >
                             {isLogin ? "Don't have an account? Sign Up" : "Already have an account? Sign In"}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
-import { LayoutDashboard, Users, MessageSquare, Calendar, BarChart3, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, MessageSquare, Calendar, BarChart3, Zap, Settings, LogOut } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Logo } from '../ui/Logo';
 import { cn } from '../../lib/utils';
@@ -21,6 +21,7 @@ export default function AppLayout() {
                         <NavItem to="/app/inbox" icon={<MessageSquare size={20} />} label="Inbox" />
                         <NavItem to="/app/bookings" icon={<Calendar size={20} />} label="Bookings" />
                         <NavItem to="/app/leads" icon={<BarChart3 size={20} />} label="Leads" />
+                        <NavItem to="/app/integrations" icon={<Zap size={20} />} label="Integrations" />
                     </nav>
                 </div>
 

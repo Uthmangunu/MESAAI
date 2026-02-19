@@ -204,6 +204,107 @@ async def instagram_webhook(request: Request):
     return Response(status_code=200)
 
 
+# ─── Facebook Messenger Webhooks ───────────────────────────────────────────────
+
+@router.get("/facebook")
+async def facebook_webhook_verify(
+    request: Request,
+):
+    """
+    Meta webhook verification for Facebook Messenger.
+    Same pattern as Instagram - Meta sends: hub.mode, hub.verify_token, hub.challenge
+    """
+    settings = get_settings()
+    mode = request.query_params.get("hub.mode")
+    token = request.query_params.get("hub.verify_token")
+    challenge = request.query_params.get("hub.challenge")
+
+    # Use same verify token for both Facebook and Instagram
+    if mode == "subscribe" and token == settings.instagram_verify_token:
+        logger.info("Facebook Messenger webhook verified successfully")
+        return Response(content=challenge, media_type="text/plain")
+
+    raise HTTPException(status_code=403, detail="Verification failed")
+
+
+@router.post("/facebook")
+async def facebook_webhook(request: Request):
+    """
+    Handle incoming Facebook Messenger messages.
+    Uses Meta Graph API v21.0 (same as Instagram).
+    """
+    settings = get_settings()
+    payload = await request.body()
+
+    # Validate signature in production
+    if settings.app_env == "production":
+        signature = request.headers.get("X-Hub-Signature-256", "")
+        if not validate_instagram_signature(payload, signature):
+            raise HTTPException(status_code=403, detail="Invalid signature")
+
+    try:
+        data = await request.json()
+    except Exception:
+        return Response(status_code=200)  # Acknowledge but ignore bad JSON
+
+    # Meta sends { "object": "page", "entry": [...] }
+    if data.get("object") != "page":
+        return Response(status_code=200)
+
+    for entry in data.get("entry", []):
+        page_id = entry.get("id")
+
+        for messaging_event in entry.get("messaging", []):
+            sender_id = messaging_event.get("sender", {}).get("id")
+            message_data = messaging_event.get("message", {})
+            message_text = message_data.get("text", "")
+
+            # Skip non-text messages (images, stickers, etc.) for now
+            if not message_text:
+                continue
+
+            # Find agent for this Facebook page
+            agent = find_agent_for_instagram(page_id)  # Same function works for FB pages
+            if not agent or agent.get("status") != "active":
+                logger.warning(f"No active agent for Facebook page {page_id}")
+                continue
+
+            org_id = agent["organization_id"]
+            page_token = get_page_access_token(org_id)
+            if not page_token:
+                logger.warning(f"No Facebook page token for org {org_id}")
+                continue
+
+            # Get sender profile for contact name
+            profile = await get_instagram_user_profile(sender_id, page_token)
+            contact_name = profile.get("name") or profile.get("first_name")
+
+            try:
+                result = await process_message(
+                    agent_id=agent["id"],
+                    organization_id=org_id,
+                    channel="facebook_messenger",
+                    contact_phone=None,
+                    contact_email=None,
+                    contact_name=contact_name,
+                    message_text=message_text,
+                )
+
+                reply = result.get("reply")
+                if reply:
+                    await send_instagram_message(  # Same API for FB Messenger
+                        recipient_id=sender_id,
+                        message_text=reply,
+                        page_access_token=page_token,
+                    )
+
+            except Exception as e:
+                logger.error(f"Facebook Messenger webhook error: {e}", exc_info=True)
+                # Don't raise — Meta expects 200 to acknowledge receipt
+
+    return Response(status_code=200)
+
+
 # ─── Stripe Webhook ────────────────────────────────────────────────────────────
 
 @router.post("/stripe")

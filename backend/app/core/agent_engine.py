@@ -11,6 +11,18 @@ from app.core.rate_limiter import (
     check_agent_rate_limit,
     RateLimitExceeded,
 )
+from app.core.conversation_flow import (
+    load_flow_definition,
+    initialize_flow_state,
+    get_current_flow_step,
+    determine_next_step,
+    extract_data_from_response,
+    update_flow_state,
+    build_flow_aware_prompt,
+    is_flow_complete,
+    get_collected_flow_data,
+)
+from app.core.lead_scoring import calculate_lead_score, is_hot_lead
 from app.integrations.supabase import get_supabase_admin
 
 
@@ -104,6 +116,18 @@ async def process_message(
     conversation_id = conversation["id"]
     contact_identifier = contact_phone or contact_email or "unknown"
 
+    # ── 2.5. Initialize conversation flow (if applicable) ───────────────────
+    flow_definition = load_flow_definition(admin, agent_id)
+    flow_state = conversation.get("flow_state", {})
+
+    # If new conversation and flow exists, initialize flow
+    if not flow_state and flow_definition:
+        flow_state = initialize_flow_state(conversation_id, flow_definition)
+        admin.table("conversations").update({
+            "flow_state": flow_state,
+            "flow_type": flow_definition.get("flow_name"),
+        }).eq("id", conversation_id).execute()
+
     # ── 3. Rate limit checks ─────────────────────────────────────────────────
     try:
         await check_contact_rate_limit(
@@ -147,6 +171,17 @@ async def process_message(
     messages = [{"role": m["role"], "content": m["content"]} for m in history]
     messages.append({"role": "user", "content": message_text})
 
+    # ── 4.5. Augment prompt with flow context (if flow active) ──────────────
+    if flow_state and flow_definition:
+        current_step_def = get_current_flow_step(flow_state, flow_definition)
+        if current_step_def:
+            flow_context = {
+                "current_step": flow_state.get("current_step"),
+                "collected_data": flow_state.get("collected_data", {}),
+                "step_definition": current_step_def,
+            }
+            system_prompt = build_flow_aware_prompt(system_prompt, flow_context)
+
     # ── 5. Run LLM with tool support ─────────────────────────────────────────
     response = chat_with_tools(
         system_prompt=system_prompt,
@@ -159,6 +194,36 @@ async def process_message(
 
     reply_text = message.content or ""
     tool_results = []
+
+    # ── 5.5. Update conversation flow state (if flow active) ────────────────
+    if flow_state and flow_definition:
+        current_step_def = get_current_flow_step(flow_state, flow_definition)
+        if current_step_def:
+            # Extract data from user's message
+            expected_fields = current_step_def.get("data_fields", [])
+            if current_step_def.get("data_field"):
+                expected_fields.append(current_step_def["data_field"])
+
+            extracted_data = extract_data_from_response(
+                message_text,
+                expected_fields,
+                current_step_def
+            )
+
+            # Determine next step
+            next_step = determine_next_step(
+                message_text,
+                current_step_def,
+                flow_state.get("collected_data", {}),
+                flow_definition
+            )
+
+            # Update flow state in database
+            update_flow_state(admin, conversation_id, next_step, extracted_data)
+
+            # Update local flow_state for lead scoring
+            flow_state["current_step"] = next_step
+            flow_state["collected_data"].update(extracted_data)
 
     # ── 6. Handle tool calls ──────────────────────────────────────────────────
     if finish_reason == "tool_calls" and message.tool_calls:
@@ -254,16 +319,77 @@ async def _execute_tool(
     admin = get_supabase_admin()
 
     if tool_name == "collect_lead":
+        # Get employee_type_id and flow data for scoring
+        agent_data = (
+            admin.table("agents")
+            .select("employee_type_id")
+            .eq("id", agent_id)
+            .single()
+            .execute()
+        )
+        employee_type_id = agent_data.data["employee_type_id"] if agent_data.data else None
+
+        # Get conversation flow data
+        conv_data = (
+            admin.table("conversations")
+            .select("flow_state, flow_type, channel")
+            .eq("id", conversation_id)
+            .single()
+            .execute()
+        )
+
+        flow_state = conv_data.data.get("flow_state", {}) if conv_data.data else {}
+        collected_data = flow_state.get("collected_data", {})
+        service_type = conv_data.data.get("flow_type") if conv_data.data else None
+        source_channel = conv_data.data.get("channel") if conv_data.data else None
+
+        # Merge tool input with collected flow data
+        all_lead_data = {
+            "name": tool_input.get("name") or collected_data.get("name"),
+            "phone": tool_input.get("phone") or collected_data.get("phone"),
+            "email": tool_input.get("email") or collected_data.get("email"),
+            "notes": tool_input.get("notes"),
+            "service_type": service_type,
+            "service_data": collected_data,
+            "urgency": collected_data.get("urgency"),
+            "source_channel": source_channel,
+        }
+
+        # Calculate lead score
+        lead_score = 0
+        is_hot = False
+        if employee_type_id:
+            lead_score = await calculate_lead_score(
+                admin,
+                employee_type_id,
+                all_lead_data,
+                service_type
+            )
+            is_hot = is_hot_lead(lead_score)
+
+        # Insert lead with score
         result = admin.table("leads").insert({
             "organization_id": organization_id,
             "agent_id": agent_id,
-            "name": tool_input.get("name"),
-            "phone": tool_input.get("phone"),
-            "email": tool_input.get("email"),
-            "notes": tool_input.get("notes"),
+            "name": all_lead_data["name"],
+            "phone": all_lead_data["phone"],
+            "email": all_lead_data["email"],
+            "notes": all_lead_data["notes"],
+            "service_type": all_lead_data["service_type"],
+            "service_data": all_lead_data["service_data"],
+            "lead_score": lead_score,
+            "is_hot": is_hot,
+            "urgency": all_lead_data["urgency"],
+            "source_channel": all_lead_data["source_channel"],
             "status": "new",
         }).execute()
-        return {"lead_id": result.data[0]["id"], "status": "saved"}
+
+        return {
+            "lead_id": result.data[0]["id"],
+            "status": "saved",
+            "lead_score": lead_score,
+            "is_hot": is_hot,
+        }
 
     elif tool_name == "book_appointment":
         result = admin.table("bookings").insert({
