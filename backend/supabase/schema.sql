@@ -41,7 +41,7 @@ VALUES (
   'A professional AI receptionist that handles enquiries, books appointments, and collects leads.',
   'You are a professional AI receptionist. Handle all inbound enquiries warmly and efficiently.',
   0, -- price_monthly set to 0 until Stripe price is configured
-  '["voice", "whatsapp", "email", "telegram", "booking"]'
+  '["voice", "whatsapp", "instagram", "email", "telegram", "booking"]'
 );
 
 -- ─── Agents (AI employee instances per org) ──────────────────────────────────
@@ -133,11 +133,25 @@ CREATE TABLE agent_logs (
 CREATE TABLE integrations (
   id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   organization_id   UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-  type              TEXT NOT NULL,  -- google_calendar | calendly | whatsapp | email
+  type              TEXT NOT NULL,  -- google_calendar | calendly | whatsapp | instagram | email
   credentials       JSONB DEFAULT '{}',
   is_connected      BOOLEAN DEFAULT FALSE,
   created_at        TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(organization_id, type)
+);
+
+-- ─── Knowledge Base ──────────────────────────────────────────────────────────
+-- Two scopes: organization-wide (agent_id IS NULL) or agent-specific (agent_id set)
+CREATE TABLE knowledge_base (
+  id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  organization_id   UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  agent_id          UUID REFERENCES agents(id) ON DELETE CASCADE,  -- NULL = org-wide
+  title             TEXT NOT NULL,
+  content           TEXT NOT NULL,
+  category          TEXT,  -- faq | services | pricing | policies | other
+  is_active         BOOLEAN DEFAULT TRUE,
+  created_at        TIMESTAMPTZ DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ─── Row Level Security ──────────────────────────────────────────────────────
@@ -151,6 +165,7 @@ ALTER TABLE leads            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bookings         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE agent_logs       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE integrations     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE knowledge_base   ENABLE ROW LEVEL SECURITY;
 -- Note: All DB access from the backend uses the service role key which bypasses RLS.
 -- RLS policies are here as a safety net for direct Supabase client access.
 
@@ -162,3 +177,5 @@ CREATE INDEX idx_leads_org ON leads(organization_id);
 CREATE INDEX idx_bookings_org ON bookings(organization_id);
 CREATE INDEX idx_agent_logs_agent ON agent_logs(agent_id);
 CREATE INDEX idx_agent_logs_created ON agent_logs(created_at DESC);
+CREATE INDEX idx_knowledge_base_org ON knowledge_base(organization_id);
+CREATE INDEX idx_knowledge_base_agent ON knowledge_base(agent_id);

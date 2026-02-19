@@ -178,3 +178,31 @@ class ChatMessage(BaseModel):
     contact_name: Optional[str] = Field(default=None, max_length=100)
     message: str = Field(min_length=1, max_length=4000)  # ~1 page of text max
     conversation_id: Optional[str] = None
+
+
+# ─── Knowledge Base ──────────────────────────────────────────────────────────
+
+class KnowledgeCreate(BaseModel):
+    agent_id: Optional[str] = None  # None = org-wide knowledge
+    title: str = Field(min_length=1, max_length=200)
+    content: str = Field(min_length=1, max_length=10000)
+    category: Optional[str] = Field(default="other", max_length=50)  # faq | services | pricing | policies | other
+
+
+class KnowledgeUpdate(BaseModel):
+    title: Optional[str] = Field(default=None, max_length=200)
+    content: Optional[str] = Field(default=None, max_length=10000)
+    category: Optional[str] = Field(default=None, max_length=50)
+    is_active: Optional[bool] = None
+
+
+class KnowledgeOut(BaseModel):
+    id: str
+    organization_id: str
+    agent_id: Optional[str] = None
+    title: str
+    content: str
+    category: Optional[str] = None
+    is_active: bool
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None

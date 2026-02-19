@@ -10,8 +10,15 @@ from collections import defaultdict
 from fastapi import Request, HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 
-# Exempt webhook paths from IP rate limiting (Twilio/Stripe have fixed IPs)
-EXEMPT_PATHS = {"/api/webhooks/whatsapp", "/api/webhooks/stripe", "/api/voice/incoming", "/api/voice/respond", "/health"}
+# Exempt webhook paths from IP rate limiting (Twilio/Stripe/Meta have their own verification)
+EXEMPT_PATHS = {
+    "/api/webhooks/whatsapp",
+    "/api/webhooks/instagram",
+    "/api/webhooks/stripe",
+    "/api/voice/incoming",
+    "/api/voice/respond",
+    "/health",
+}
 
 # Limits
 REQUESTS_PER_MINUTE = 60

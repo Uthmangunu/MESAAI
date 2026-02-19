@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     # Calendly
     calendly_api_key: str = ""
 
+    # Instagram (via Meta Graph API)
+    instagram_app_secret: str = ""  # For webhook signature validation
+    instagram_verify_token: str = ""  # Your chosen token for webhook verification
+
     class Config:
         env_file = ".env"
         case_sensitive = False

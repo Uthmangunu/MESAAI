@@ -51,11 +51,15 @@ async def process_message(
     org_name = agent["organizations"]["name"]
     custom_prompt = agent.get("custom_system_prompt") or ""
 
+    # ── Load knowledge base (org-wide + agent-specific) ─────────────────────
+    knowledge_text = _load_knowledge(admin, organization_id, agent_id)
+
     system_prompt = RECEPTIONIST_BASE_PROMPT.format(
         agent_name=agent["name"],
         org_name=org_name,
         business_context=custom_prompt or "No additional business context provided.",
         current_datetime=datetime.now().strftime("%A, %d %B %Y at %H:%M"),
+        knowledge_base=knowledge_text,
     )
 
     # ── 2. Get or create conversation ────────────────────────────────────────
@@ -280,3 +284,29 @@ async def _execute_tool(
         return {"status": "escalated", "reason": tool_input.get("reason")}
 
     return {"status": "unknown_tool"}
+
+
+def _load_knowledge(admin, organization_id: str, agent_id: str) -> str:
+    """Load knowledge base entries for this agent (org-wide + agent-specific)."""
+    result = (
+        admin.table("knowledge_base")
+        .select("title, content, category")
+        .eq("organization_id", organization_id)
+        .eq("is_active", True)
+        .or_(f"agent_id.is.null,agent_id.eq.{agent_id}")
+        .order("category")
+        .execute()
+    )
+
+    if not result.data:
+        return "No specific knowledge base configured."
+
+    # Format knowledge entries
+    lines = []
+    for entry in result.data:
+        category = entry.get("category", "general").upper()
+        title = entry.get("title", "")
+        content = entry.get("content", "")
+        lines.append(f"[{category}] {title}:\n{content}")
+
+    return "\n\n".join(lines)

@@ -1,13 +1,21 @@
 """
 Webhook handlers for:
 - WhatsApp (Twilio)
+- Instagram (Meta Graph API)
 - Stripe (billing events)
 """
 
-from fastapi import APIRouter, Request, Response, HTTPException, Form
+from fastapi import APIRouter, Request, Response, HTTPException, Form, Query
 from app.integrations.supabase import get_supabase_admin
 from app.integrations.whatsapp import send_whatsapp_message, validate_twilio_signature
 from app.integrations import stripe as stripe_integration
+from app.integrations.instagram import (
+    validate_webhook_signature as validate_instagram_signature,
+    send_instagram_message,
+    get_page_access_token,
+    find_agent_for_instagram,
+    get_instagram_user_profile,
+)
 from app.core.agent_engine import process_message
 from app.config import get_settings
 import logging
@@ -95,6 +103,105 @@ async def whatsapp_webhook(
         logger.error(f"WhatsApp webhook error: {e}", exc_info=True)
         # Return 500 so Twilio retries — don't silently swallow failures
         raise HTTPException(status_code=500, detail="Failed to process message")
+
+
+# ─── Instagram Webhooks ────────────────────────────────────────────────────────
+
+@router.get("/instagram")
+async def instagram_webhook_verify(
+    request: Request,
+):
+    """
+    Meta webhook verification — responds to the challenge.
+    Meta sends: hub.mode, hub.verify_token, hub.challenge
+    """
+    settings = get_settings()
+    mode = request.query_params.get("hub.mode")
+    token = request.query_params.get("hub.verify_token")
+    challenge = request.query_params.get("hub.challenge")
+
+    if mode == "subscribe" and token == settings.instagram_verify_token:
+        logger.info("Instagram webhook verified successfully")
+        return Response(content=challenge, media_type="text/plain")
+
+    raise HTTPException(status_code=403, detail="Verification failed")
+
+
+@router.post("/instagram")
+async def instagram_webhook(request: Request):
+    """
+    Handle incoming Instagram DM messages.
+    """
+    settings = get_settings()
+    payload = await request.body()
+
+    # Validate signature in production
+    if settings.app_env == "production":
+        signature = request.headers.get("X-Hub-Signature-256", "")
+        if not validate_instagram_signature(payload, signature):
+            raise HTTPException(status_code=403, detail="Invalid signature")
+
+    try:
+        data = await request.json()
+    except Exception:
+        return Response(status_code=200)  # Acknowledge but ignore bad JSON
+
+    # Meta sends { "object": "instagram", "entry": [...] }
+    if data.get("object") != "instagram":
+        return Response(status_code=200)
+
+    for entry in data.get("entry", []):
+        page_id = entry.get("id")
+
+        for messaging_event in entry.get("messaging", []):
+            sender_id = messaging_event.get("sender", {}).get("id")
+            message_data = messaging_event.get("message", {})
+            message_text = message_data.get("text", "")
+
+            # Skip non-text messages (images, stickers, etc.) for now
+            if not message_text:
+                continue
+
+            # Find agent for this Instagram page
+            agent = find_agent_for_instagram(page_id)
+            if not agent or agent.get("status") != "active":
+                logger.warning(f"No active agent for Instagram page {page_id}")
+                continue
+
+            org_id = agent["organization_id"]
+            page_token = get_page_access_token(org_id)
+            if not page_token:
+                logger.warning(f"No Instagram page token for org {org_id}")
+                continue
+
+            # Get sender profile for contact name
+            profile = await get_instagram_user_profile(sender_id, page_token)
+            contact_name = profile.get("name") or profile.get("username")
+
+            try:
+                result = await process_message(
+                    agent_id=agent["id"],
+                    organization_id=org_id,
+                    channel="instagram",
+                    contact_phone=None,
+                    contact_email=None,
+                    contact_name=contact_name,
+                    message_text=message_text,
+                )
+
+                reply = result.get("reply")
+                if reply:
+                    await send_instagram_message(
+                        recipient_id=sender_id,
+                        message_text=reply,
+                        page_access_token=page_token,
+                    )
+
+            except Exception as e:
+                logger.error(f"Instagram webhook error: {e}", exc_info=True)
+                # Don't raise — Meta expects 200 to acknowledge receipt
+
+    return Response(status_code=200)
 
 
 # ─── Stripe Webhook ────────────────────────────────────────────────────────────

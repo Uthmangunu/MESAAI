@@ -15,6 +15,7 @@ from app.api import (
     webhooks,
     logs,
     integrations,
+    knowledge,
 )
 
 settings = get_settings()
@@ -51,7 +52,8 @@ app.include_router(leads.router, prefix=PREFIX)
 app.include_router(billing.router, prefix=PREFIX)
 app.include_router(logs.router, prefix=PREFIX)
 app.include_router(integrations.router, prefix=PREFIX)
-app.include_router(webhooks.router, prefix=PREFIX)  # No auth — Twilio/Stripe verify themselves
+app.include_router(knowledge.router, prefix=PREFIX)
+app.include_router(webhooks.router, prefix=PREFIX)  # No auth — Twilio/Stripe/Meta verify themselves
 
 
 @app.get("/health")
