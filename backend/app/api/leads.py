@@ -1,3 +1,4 @@
+from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends
 from app.integrations.supabase import get_supabase_admin
 from app.models.schemas import LeadCreate, LeadUpdate
@@ -8,10 +9,10 @@ router = APIRouter(prefix="/leads", tags=["leads"])
 
 @router.get("")
 async def list_leads(
-    status: str | None = None,
-    agent_id: str | None = None,
-    is_hot: bool | None = None,
-    service_type: str | None = None,
+    status: Optional[str] = None,
+    agent_id: Optional[str] = None,
+    is_hot: Optional[bool] = None,
+    service_type: Optional[str] = None,
     limit: int = 100,
     user_data=Depends(get_current_user_org),
 ):
