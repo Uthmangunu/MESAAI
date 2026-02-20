@@ -2,6 +2,7 @@
 The core agent engine — processes incoming messages and drives agent actions.
 """
 import json
+from typing import Optional
 from datetime import datetime
 from app.core.llm import chat_with_tools, chat_completion
 from app.core.tools import AGENT_TOOLS
@@ -30,11 +31,11 @@ async def process_message(
     agent_id: str,
     organization_id: str,
     channel: str,
-    contact_phone: str | None,
-    contact_email: str | None,
-    contact_name: str | None,
+    contact_phone: Optional[str],
+    contact_email: Optional[str],
+    contact_name: Optional[str],
     message_text: str,
-    conversation_id: str | None = None,
+    conversation_id: Optional[str] = None,
 ) -> dict:
     """
     Main agent loop:

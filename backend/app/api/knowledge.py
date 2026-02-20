@@ -1,6 +1,7 @@
 """
 Knowledge Base API — CRUD for org-wide and agent-specific knowledge.
 """
+from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends
 from app.integrations.supabase import get_supabase_admin
 from app.models.schemas import KnowledgeCreate, KnowledgeUpdate
@@ -11,8 +12,8 @@ router = APIRouter(prefix="/knowledge", tags=["knowledge"])
 
 @router.get("")
 async def list_knowledge(
-    agent_id: str | None = None,
-    category: str | None = None,
+    agent_id: Optional[str] = None,
+    category: Optional[str] = None,
     include_org_wide: bool = True,
     user_data=Depends(get_current_user_org),
 ):
